@@ -1,0 +1,21 @@
+{% extends "listings/base.html" %}
+{% block content %}
+<h2 class="mb-4">🤖 OtoRadar Asistanı</h2>
+<p class="text-muted">Fiyatlar ve ilanlar hakkında doğal dilde soru sor.</p>
+
+<form method="post" class="d-flex gap-2 mb-4">
+  {% csrf_token %}
+  {{ form.question }}
+  <button type="submit" class="btn btn-success">Sor</button>
+</form>
+
+{% if question %}
+<div class="card bg-secondary bg-opacity-25 text-light mb-3">
+  <div class="card-body">
+    <p class="fw-bold">Soru: {{ question }}</p>
+    <hr>
+    <p style="white-space: pre-line;">{{ answer }}</p>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

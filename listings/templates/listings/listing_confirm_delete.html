@@ -1,0 +1,10 @@
+{% extends "listings/base.html" %}
+{% block content %}
+<h2>Silmek istediğine emin misin?</h2>
+<p>{{ listing }}</p>
+<form method="post">
+  {% csrf_token %}
+  <button type="submit" class="btn btn-danger">Evet, sil</button>
+  <a href="{% url 'listing-detail' listing.pk %}" class="btn btn-secondary">Vazgeç</a>
+</form>
+{% endblock %}

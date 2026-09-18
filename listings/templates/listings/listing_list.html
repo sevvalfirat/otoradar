@@ -1,0 +1,19 @@
+{% extends "listings/base.html" %}
+{% block content %}
+<h2 class="mb-4">İlanlar</h2>
+<div class="row">
+  {% for listing in listings %}
+  <div class="col-md-4 mb-4">
+    <div class="card bg-secondary bg-opacity-25 text-light h-100">
+      <div class="card-body">
+        <h5 class="card-title">{{ listing.brand }} {{ listing.model_name }} ({{ listing.year }})</h5>
+        <p class="card-text">{{ listing.price }} TL — {{ listing.mileage_km }} km</p>
+        <a href="{% url 'listing-detail' listing.pk %}" class="btn btn-outline-light btn-sm">Detay</a>
+      </div>
+    </div>
+  </div>
+  {% empty %}
+  <p>Henüz ilan yok.</p>
+  {% endfor %}
+</div>
+{% endblock %}

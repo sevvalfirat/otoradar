@@ -1,0 +1,11 @@
+{% extends "listings/base.html" %}
+{% block content %}
+<h2>{{ listing.brand }} {{ listing.model_name }} ({{ listing.year }})</h2>
+<p>Fiyat: <strong>{{ listing.price }} TL</strong></p>
+<p>Kilometre: {{ listing.mileage_km }} km</p>
+<p>Yakıt: {{ listing.get_fuel_type_display }} | Vites: {{ listing.get_transmission_display }}</p>
+<p>Şehir: {{ listing.city }}</p>
+<p>{{ listing.description }}</p>
+<a href="{% url 'listing-update' listing.pk %}" class="btn btn-warning btn-sm">Düzenle</a>
+<a href="{% url 'listing-delete' listing.pk %}" class="btn btn-danger btn-sm">Sil</a>
+{% endblock %}
