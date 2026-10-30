@@ -1,0 +1,5 @@
+# Uygulamanın bütün Kubernetes nesneleri bu ad alanında durur.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: otoradar

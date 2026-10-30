@@ -1,0 +1,88 @@
+# Django web uygulaması: 2 kopya, mümkünse her node'da bir tane.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otoradar-web
+  namespace: otoradar
+  labels:
+    app: otoradar-web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: otoradar-web
+  template:
+    metadata:
+      labels:
+        app: otoradar-web
+    spec:
+      # Pod'ları node'lara yay: biri node1'de, biri node2'de olsun.
+      # ScheduleAnyway: bir node çökerse yeni pod ayakta kalan node'da açılabilsin.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: otoradar-web
+      # Varsayılan 300 sn yerine: node'a 30 sn ulaşılamazsa pod'u başka node'da yeniden kur.
+      tolerations:
+        - key: node.kubernetes.io/unreachable
+          operator: Exists
+          effect: NoExecute
+          tolerationSeconds: 30
+        - key: node.kubernetes.io/not-ready
+          operator: Exists
+          effect: NoExecute
+          tolerationSeconds: 30
+      containers:
+        - name: web
+          image: otoradar:1.0
+          imagePullPolicy: Never      # image node'lara elle yüklendi, internetten çekme
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: otoradar-config
+            - secretRef:
+                name: otoradar-secrets
+          env:
+            - name: NODE_NAME           # logda hangi node'da çalıştığı görünsün
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          # Hazır mı? (veritabanına erişip sayfa üretebiliyor mu)
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8000
+              httpHeaders:
+                - name: Host
+                  value: localhost   # ALLOWED_HOSTS'a takılmasın
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          # Canlı mı? (gunicorn cevap veriyor mu; veritabanından bağımsız)
+          livenessProbe:
+            tcpSocket:
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 768Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: otoradar-web
+  namespace: otoradar
+spec:
+  selector:
+    app: otoradar-web
+  ports:
+    - port: 80
+      targetPort: 8000

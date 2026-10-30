@@ -1,0 +1,23 @@
+# Veritabanı tablolarını oluşturan tek seferlik iş.
+# PostgreSQL henüz hazır değilse başarısız olur ve Kubernetes tekrar dener.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: otoradar-migrate
+  namespace: otoradar
+spec:
+  backoffLimit: 10
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrate
+          image: otoradar:1.0
+          imagePullPolicy: Never
+          command: ["python", "manage.py", "migrate", "--noinput"]
+          envFrom:
+            - configMapRef:
+                name: otoradar-config
+            - secretRef:
+                name: otoradar-secrets

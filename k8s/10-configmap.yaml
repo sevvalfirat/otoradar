@@ -1,0 +1,12 @@
+# Gizli OLMAYAN ayarlar. Gizli olanlar (şifreler, API anahtarı) Secret'ta durur
+# ve repoya girmez; Secret'ı oluşturma komutu README'de.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otoradar-config
+  namespace: otoradar
+data:
+  DJANGO_DEBUG: "False"
+  DJANGO_ALLOWED_HOSTS: "82.153.241.242,93.177.102.160,localhost,127.0.0.1"
+  DJANGO_CSRF_TRUSTED_ORIGINS: "http://82.153.241.242,http://93.177.102.160"
+  GEMINI_MODEL: "gemini-3.6-flash"
