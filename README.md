@@ -44,6 +44,41 @@ Tarayıcı ──► Django (views, templates) ──► ORM / ham SQL ──►
 
 **Bilinen sınırlama:** Bu yapı yalnızca web katmanını korur. node1 çökerse hem K3s yönetimi hem PostgreSQL gider; sistemin tek zayıf noktası node1'dir. Üretimde çözüm, birden fazla control-plane ve veritabanı replikasyonudur.
 
+### Kubernetes'e kurulum
+
+```bash
+kubectl apply -f k8s/00-namespace.yaml
+DB_PASS=$(openssl rand -hex 16)
+kubectl -n otoradar create secret generic otoradar-secrets \
+  --from-literal=POSTGRES_PASSWORD="$DB_PASS" \
+  --from-literal=DATABASE_URL="postgres://otoradar:${DB_PASS}@postgres:5432/otoradar" \
+  --from-literal=DJANGO_SECRET_KEY="$(openssl rand -hex 32)" \
+  --from-literal=GEMINI_API_KEY='...'
+kubectl apply -f k8s/
+kubectl -n otoradar exec deploy/otoradar-web -- python manage.py generate_data --count 3000
+```
+
+Gizli değerler repoda değil, yalnızca cluster içindeki Secret'ta durur. Node'lar arası pod trafiği
+açık internet üzerinden geçtiği için Flannel `wireguard-native` backend'i ile şifrelenir.
+
+### Node failure demosu (ölçülmüş sonuçlar)
+
+node1'den saniyede bir `curl` ile siteye istek atılırken node2 `poweroff` ile kapatıldı:
+
+| Zaman | Olay |
+|---|---|
+| T+0 sn | node2 kapandı |
+| T+1 – T+45 sn | Kısmi kesinti: isteklerin bir kısmı node2'deki pod'a gidip zaman aşımına uğradı, diğerleri node1'den `200` döndü. Site hiçbir an tamamen kapanmadı |
+| ~T+45 sn | node2 `NotReady` işaretlendi, pod'u servis uç noktalarından çıkarıldı. Tüm istekler `200` |
+| ~T+75 sn | `tolerationSeconds: 30` doldu, node2'deki pod `Terminating` oldu, node1'de yeni pod açıldı (11 sn'de hazır) |
+
+node2 geri açıldığında pod'lar otomatik geri taşınmaz; `kubectl rollout restart deployment otoradar-web`
+ile kesintisiz (rolling update) yeniden dağıtıldı.
+
+**Kesintiyi kısaltmak için:** Kubernetes'in node'un öldüğüne karar verme süresi (`node-monitor-grace-period`)
+kısaltılabilir veya Traefik'e aktif health-check eklenebilir. Bu sürenin çok kısa olması ise kısa ağ
+dalgalanmalarında gereksiz pod taşımalarına yol açar; varsayılan bilinçli olarak korundu.
+
 ## Kurulum (local)
 
 ```bash
