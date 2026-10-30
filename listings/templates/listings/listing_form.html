@@ -1,9 +1,53 @@
 {% extends "listings/base.html" %}
+{% block title %}{% if object %}İlanı düzenle{% else %}İlan ver{% endif %}{% endblock %}
 {% block content %}
-<h2>İlan Formu</h2>
-<form method="post">
-  {% csrf_token %}
-  {{ form.as_p }}
-  <button type="submit" class="btn btn-success">Kaydet</button>
-</form>
+<div class="form-layout">
+  <div class="page-head">
+    <div>
+      <h1>{% if object %}İlanı düzenle{% else %}Yeni ilan ver{% endif %}</h1>
+      <p>{% if object %}{{ object }} ilanındaki bilgileri güncelle.{% else %}Aracının bilgilerini gir; ilan hemen listede görünür.{% endif %}</p>
+    </div>
+  </div>
+
+  {% if form.non_field_errors %}<div class="flash flash--error">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+
+    <fieldset class="form-section">
+      <legend>Araç</legend>
+      <div class="form-grid">
+        {% include "listings/_field.html" with field=form.brand %}
+        {% include "listings/_field.html" with field=form.model_name %}
+        {% include "listings/_field.html" with field=form.year %}
+      </div>
+    </fieldset>
+
+    <fieldset class="form-section">
+      <legend>Durum</legend>
+      <div class="form-grid">
+        {% include "listings/_field.html" with field=form.mileage_km %}
+        {% include "listings/_field.html" with field=form.fuel_type %}
+        {% include "listings/_field.html" with field=form.transmission %}
+      </div>
+    </fieldset>
+
+    <fieldset class="form-section">
+      <legend>Fiyat ve konum</legend>
+      <div class="form-grid form-grid--2">
+        {% include "listings/_field.html" with field=form.price %}
+        {% include "listings/_field.html" with field=form.city %}
+      </div>
+      {% include "listings/_field.html" with field=form.description %}
+    </fieldset>
+
+    <datalist id="brand-options">{% for b in form.brand_options %}<option value="{{ b }}">{% endfor %}</datalist>
+    <datalist id="model-options">{% for m in form.model_options %}<option value="{{ m }}">{% endfor %}</datalist>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn--signal">{% if object %}Değişiklikleri kaydet{% else %}İlanı yayınla{% endif %}</button>
+      <a href="{% if object %}{% url 'listing-detail' object.pk %}{% else %}{% url 'listing-list' %}{% endif %}" class="btn btn--ghost">Vazgeç</a>
+    </div>
+  </form>
+</div>
 {% endblock %}

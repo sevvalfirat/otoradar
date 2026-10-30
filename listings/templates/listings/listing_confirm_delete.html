@@ -1,10 +1,15 @@
 {% extends "listings/base.html" %}
+{% load otoradar %}
+{% block title %}İlanı sil{% endblock %}
 {% block content %}
-<h2>Silmek istediğine emin misin?</h2>
-<p>{{ listing }}</p>
-<form method="post">
-  {% csrf_token %}
-  <button type="submit" class="btn btn-danger">Evet, sil</button>
-  <a href="{% url 'listing-detail' listing.pk %}" class="btn btn-secondary">Vazgeç</a>
-</form>
+<div class="confirm">
+  <h1>Bu ilan silinsin mi?</h1>
+  <p><strong>{{ listing.brand }} {{ listing.model_name }} ({{ listing.year }})</strong>, {{ listing.price|tl }} TL, {{ listing.city }}.</p>
+  <p class="muted">Silinen ilan geri getirilemez.</p>
+  <form method="post" class="form-actions">
+    {% csrf_token %}
+    <button type="submit" class="btn btn--danger">İlanı sil</button>
+    <a href="{% url 'listing-detail' listing.pk %}" class="btn btn--ghost">Vazgeç</a>
+  </form>
+</div>
 {% endblock %}

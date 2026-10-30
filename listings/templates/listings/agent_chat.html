@@ -1,21 +1,77 @@
 {% extends "listings/base.html" %}
+{% load otoradar %}
+{% block title %}Asistan{% endblock %}
 {% block content %}
-<h2 class="mb-4">🤖 OtoRadar Asistanı</h2>
-<p class="text-muted">Fiyatlar ve ilanlar hakkında doğal dilde soru sor.</p>
-
-<form method="post" class="d-flex gap-2 mb-4">
-  {% csrf_token %}
-  {{ form.question }}
-  <button type="submit" class="btn btn-success">Sor</button>
-</form>
-
-{% if question %}
-<div class="card bg-secondary bg-opacity-25 text-light mb-3">
-  <div class="card-body">
-    <p class="fw-bold">Soru: {{ question }}</p>
-    <hr>
-    <p style="white-space: pre-line;">{{ answer }}</p>
+<div class="page-head">
+  <div>
+    <h1>OtoRadar asistanı</h1>
+    <p>Araç fiyatlarını ve ilanları doğal dilde sor; cevaplar gerçek ilan verisinden gelir.</p>
   </div>
+  {% if history %}
+  <form method="post">{% csrf_token %}<button name="clear" value="1" class="btn btn--ghost btn--sm">Sohbeti temizle</button></form>
+  {% endif %}
 </div>
-{% endif %}
+
+<div class="chat">
+  <section>
+    <div class="chat__log" aria-live="polite">
+      {% for item in history %}
+        <div class="msg msg--user">{{ item.question }}</div>
+        <div class="msg msg--bot">
+          <div class="msg__source src-{{ item.source }}">
+            {% if item.source == "local" %}Veritabanından, LLM kullanılmadan{% elif item.source == "gemini" %}Gemini, tool çağrısıyla{% else %}Bağlantı hatası{% endif %}
+          </div>
+          {{ item.answer|simple_markdown }}
+        </div>
+      {% empty %}
+        <div class="chat__empty">
+          <p><strong>Henüz soru yok.</strong></p>
+          <p>Sağdaki örneklerden birine tıklayabilir ya da kendi sorunu yazabilirsin.</p>
+        </div>
+      {% endfor %}
+    </div>
+
+    <form method="post" class="chat__form" id="ask-form">
+      {% csrf_token %}
+      <label for="{{ form.question.id_for_label }}" class="visually-hidden">Sorun</label>
+      {{ form.question }}
+      <button type="submit" class="btn btn--signal" id="ask-btn">Sor</button>
+    </form>
+    {% for error in form.question.errors %}<div class="field__error">{{ error }}</div>{% endfor %}
+  </section>
+
+  <aside>
+    <div class="panel">
+      <h3>Örnek sorular</h3>
+      <div class="examples">
+        {% for q in examples %}<button type="button" class="example" data-q="{{ q }}">{{ q }}</button>{% endfor %}
+      </div>
+    </div>
+    <div class="panel">
+      <h3>Cevaplar nereden gelir?</h3>
+      <dl class="how">
+        <dt>Net fiyat soruları</dt>
+        <dd>Marka, model ve yıl sorudan çıkarılır, istatistik doğrudan veritabanından hesaplanır.</dd>
+        <dt>Yorum ve ilan kontrolü</dt>
+        <dd>Gemini, fiyat istatistiği ve anomali tespiti fonksiyonlarını çağırarak cevap verir.</dd>
+      </dl>
+    </div>
+  </aside>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    const form = document.getElementById("ask-form");
+    const input = form.querySelector("input[name=question]");
+    const btn = document.getElementById("ask-btn");
+    document.querySelectorAll(".example").forEach(b =>
+      b.addEventListener("click", () => { input.value = b.dataset.q; input.focus(); })
+    );
+    form.addEventListener("submit", () => { btn.disabled = true; btn.textContent = "Cevaplanıyor…"; });
+    const log = document.querySelector(".chat__log");
+    log.lastElementChild && log.lastElementChild.scrollIntoView({ block: "nearest" });
+  })();
+</script>
 {% endblock %}

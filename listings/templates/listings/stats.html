@@ -1,0 +1,110 @@
+{% extends "listings/base.html" %}
+{% load otoradar static %}
+{% block title %}İstatistik{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Piyasa istatistikleri</h1>
+    <p>Marka özeti ham SQL (GROUP BY) ile, yıllara göre fiyat eğilimi Pandas ile hesaplanır.</p>
+  </div>
+</div>
+
+<dl class="figures">
+  <div><dt>Toplam ilan</dt><dd>{{ totals.count|km }}</dd></div>
+  <div><dt>Ortalama fiyat</dt><dd>{{ totals.avg|tl }} TL</dd></div>
+  <div><dt>Marka sayısı</dt><dd>{{ summary|length }}</dd></div>
+</dl>
+
+{% if summary %}
+<div class="stats-grid">
+  <section class="panel" aria-labelledby="marka-tablo">
+    <h2 id="marka-tablo">Marka özeti</h2>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>Marka</th><th class="right">İlan</th><th class="right">Ortalama fiyat</th></tr></thead>
+        <tbody>
+          {% for r in summary %}
+          <tr>
+            <td><a href="{% url 'listing-list' %}?brand={{ r.brand|urlencode }}">{{ r.brand }}</a></td>
+            <td class="right">{{ r.count|km }}</td>
+            <td class="right">{{ r.avg_price|tl }} TL</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <details>
+      <summary class="muted" style="margin-top:1rem;cursor:pointer;">Kullanılan SQL sorgusu</summary>
+      <pre class="sql-note">SELECT brand, COUNT(*) AS adet, ROUND(AVG(price), 0) AS ort_fiyat
+FROM listings_listing
+GROUP BY brand
+ORDER BY ort_fiyat DESC;</pre>
+    </details>
+  </section>
+
+  <section class="panel" aria-labelledby="marka-grafik">
+    <h2 id="marka-grafik">Markalara göre ortalama fiyat</h2>
+    <div class="chart-box"><canvas id="brandChart" aria-label="Markalara göre ortalama fiyat grafiği" role="img"></canvas></div>
+  </section>
+</div>
+
+<div class="stats-grid">
+  <section class="panel" aria-labelledby="yakit">
+    <h2 id="yakit">Yakıt türü dağılımı</h2>
+    <ul class="fuel-list">
+      {% for f in fuel_counts %}
+      <li>
+        <span>{{ f.label }}</span>
+        <span class="fuel-bar"><span style="width: {{ f.pct }}%"></span></span>
+        <span class="num muted">%{{ f.pct }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  <section class="panel" aria-labelledby="yil-grafik">
+    <h2 id="yil-grafik">Model yılına göre ortalama fiyat</h2>
+    <div class="chart-box"><canvas id="yearChart" aria-label="Model yılına göre ortalama fiyat grafiği" role="img"></canvas></div>
+  </section>
+</div>
+{% else %}
+<div class="empty">
+  <h2>Henüz veri yok</h2>
+  <p>İstatistik için önce ilan ekle veya örnek veri üret: <code>python manage.py generate_data</code></p>
+</div>
+{% endif %}
+
+{{ chart_data|json_script:"chart-data" }}
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'listings/js/chart.umd.js' %}"></script>
+<script>
+  (function () {
+    if (!window.Chart || !document.getElementById("brandChart")) return;
+    const d = JSON.parse(document.getElementById("chart-data").textContent);
+    const tl = v => new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(v) + " TL";
+    Chart.defaults.font.family = "Barlow, system-ui, sans-serif";
+    Chart.defaults.color = "#5e6b78";
+
+    new Chart(document.getElementById("brandChart"), {
+      type: "bar",
+      data: { labels: d.brands.labels, datasets: [{ label: "Ortalama fiyat", data: d.brands.values, backgroundColor: "#1d2733", hoverBackgroundColor: "#f5b700", borderRadius: 3 }] },
+      options: {
+        indexAxis: "y", maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => tl(c.parsed.x) } } },
+        scales: { x: { ticks: { callback: v => (v / 1e6).toLocaleString("tr-TR") + " mn" }, grid: { color: "#eef1f4" } }, y: { grid: { display: false } } }
+      }
+    });
+
+    new Chart(document.getElementById("yearChart"), {
+      type: "line",
+      data: { labels: d.years.labels, datasets: [{ label: "Ortalama fiyat", data: d.years.values, borderColor: "#1f4fa3", backgroundColor: "#1f4fa3", pointRadius: 3, tension: .25 }] },
+      options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => tl(c.parsed.y) } } },
+        scales: { y: { ticks: { callback: v => (v / 1e6).toLocaleString("tr-TR") + " mn" }, grid: { color: "#eef1f4" } }, x: { grid: { display: false } } }
+      }
+    });
+  })();
+</script>
+{% endblock %}

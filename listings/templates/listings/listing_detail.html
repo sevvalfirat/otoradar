@@ -1,11 +1,94 @@
 {% extends "listings/base.html" %}
+{% load otoradar %}
+{% block title %}{{ listing.brand }} {{ listing.model_name }} ({{ listing.year }}){% endblock %}
 {% block content %}
-<h2>{{ listing.brand }} {{ listing.model_name }} ({{ listing.year }})</h2>
-<p>Fiyat: <strong>{{ listing.price }} TL</strong></p>
-<p>Kilometre: {{ listing.mileage_km }} km</p>
-<p>Yakıt: {{ listing.get_fuel_type_display }} | Vites: {{ listing.get_transmission_display }}</p>
-<p>Şehir: {{ listing.city }}</p>
-<p>{{ listing.description }}</p>
-<a href="{% url 'listing-update' listing.pk %}" class="btn btn-warning btn-sm">Düzenle</a>
-<a href="{% url 'listing-delete' listing.pk %}" class="btn btn-danger btn-sm">Sil</a>
+<nav class="crumbs" aria-label="Konum"><a href="{% url 'listing-list' %}">İlanlar</a> / <a href="{% url 'listing-list' %}?brand={{ listing.brand|urlencode }}">{{ listing.brand }}</a></nav>
+
+<div class="detail">
+  <article>
+    <div class="detail__title">
+      <h1>{{ listing.brand }} {{ listing.model_name }}</h1>
+    </div>
+    <p class="detail__sub">{{ listing.year }} model, {{ listing.city }}. İlan no {{ listing.pk }}</p>
+
+    <dl class="specs">
+      <div><dt>Model yılı</dt><dd>{{ listing.year }}</dd></div>
+      <div><dt>Kilometre</dt><dd>{{ listing.mileage_km|km }} km</dd></div>
+      <div><dt>Yakıt</dt><dd>{{ listing.get_fuel_type_display }}</dd></div>
+      <div><dt>Vites</dt><dd>{{ listing.get_transmission_display }}</dd></div>
+      <div><dt>Şehir</dt><dd>{{ listing.city }}</dd></div>
+      <div><dt>İlan tarihi</dt><dd>{{ listing.created_at|date:"j F Y" }}</dd></div>
+    </dl>
+
+    <h2>Açıklama</h2>
+    <div class="prose">
+      {% if listing.description %}<p>{{ listing.description|linebreaksbr }}</p>{% else %}<p class="muted">Satıcı açıklama eklememiş.</p>{% endif %}
+    </div>
+  </article>
+
+  <aside>
+    <div class="panel price-panel">
+      <div class="price-panel__label">Fiyat</div>
+      <div class="price-panel__price">{{ listing.price|tl }} <small>TL</small></div>
+      {% include "listings/_plate.html" with city=listing.city large=True %}
+      <div class="price-panel__actions">
+        <a href="{% url 'listing-update' listing.pk %}" class="btn btn--ghost">Düzenle</a>
+        <a href="{% url 'listing-delete' listing.pk %}" class="btn btn--ghost">Sil</a>
+      </div>
+    </div>
+
+    <section class="panel" aria-labelledby="analiz">
+      <h3 id="analiz">Fiyat analizi</h3>
+      {% if analysis.enough_data %}
+        {% if analysis.is_anomaly %}
+          <span class="verdict verdict--alert">Piyasa ortalamasının belirgin şekilde {% if analysis.direction == "düşük" %}altında{% else %}üstünde{% endif %}</span>
+        {% else %}
+          <span class="verdict verdict--ok">Piyasa ortalamasına yakın</span>
+        {% endif %}
+        <p>{{ analysis.message }}</p>
+
+        <div class="meter" role="img" aria-label="Bu ilanın fiyatı, benzer ilanların ortalamasına göre z-score {{ analysis.z_score }}">
+          <div class="meter__track">
+            <span class="meter__mean"></span>
+            <span class="meter__marker" style="left: {{ meter_position }}%"></span>
+          </div>
+          <div class="meter__scale"><span>Çok ucuz</span><span>Ortalama</span><span>Çok pahalı</span></div>
+        </div>
+
+        <dl class="facts">
+          <div><dt>Karşılaştırılan ilan</dt><dd>{{ analysis.group_size }}</dd></div>
+          <div><dt>Grup ortalaması</dt><dd>{{ analysis.group_mean_price|tl }} TL</dd></div>
+          <div><dt>Z-score</dt><dd>{{ analysis.z_score }}</dd></div>
+        </dl>
+        <p class="muted" style="font-size:.825rem;margin:1rem 0 0;">Aynı marka ve model, ±2 model yılı. Gri bant ±2 standart sapmalık normal aralıktır.</p>
+      {% else %}
+        <span class="verdict verdict--neutral">Analiz yapılamadı</span>
+        <p class="muted" style="margin:0;">{{ analysis.message }}</p>
+      {% endif %}
+    </section>
+  </aside>
+</div>
+
+{% if similar %}
+<section class="similar" aria-labelledby="benzer">
+  <h2 id="benzer">Benzer ilanlar</h2>
+  <div class="listing-table">
+    {% for s in similar %}
+    <a class="listing-row" href="{% url 'listing-detail' s.pk %}">
+      {% include "listings/_plate.html" with city=s.city %}
+      <div class="listing-row__main">
+        <div class="listing-row__title">{{ s.brand }} {{ s.model_name }}</div>
+        <div class="listing-row__desc">{{ s.city }}</div>
+      </div>
+      <div class="listing-row__meta">
+        <span class="num"><span class="cell-label">Yıl </span>{{ s.year }}</span>
+        <span class="num">{{ s.mileage_km|km }} km</span>
+        <span>{{ s.get_fuel_type_display }}</span>
+      </div>
+      <div class="listing-row__price">{{ s.price|tl }} <small>TL</small></div>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
 {% endblock %}

@@ -1,6 +1,10 @@
 venv/
+.venv/
 __pycache__/
 *.pyc
 .env
 db.sqlite3
 .git/
+staticfiles/
+k8s/
+README.md

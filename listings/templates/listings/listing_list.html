@@ -1,19 +1,117 @@
 {% extends "listings/base.html" %}
+{% load otoradar %}
+{% block title %}İlanlar{% endblock %}
 {% block content %}
-<h2 class="mb-4">İlanlar</h2>
-<div class="row">
-  {% for listing in listings %}
-  <div class="col-md-4 mb-4">
-    <div class="card bg-secondary bg-opacity-25 text-light h-100">
-      <div class="card-body">
-        <h5 class="card-title">{{ listing.brand }} {{ listing.model_name }} ({{ listing.year }})</h5>
-        <p class="card-text">{{ listing.price }} TL — {{ listing.mileage_km }} km</p>
-        <a href="{% url 'listing-detail' listing.pk %}" class="btn btn-outline-light btn-sm">Detay</a>
-      </div>
-    </div>
+<div class="page-head">
+  <div>
+    <h1>Satılık araçlar</h1>
+    <p>{{ total_count|km }} ilan arasında marka, bütçe ve yakıt türüne göre arama yap.</p>
   </div>
-  {% empty %}
-  <p>Henüz ilan yok.</p>
-  {% endfor %}
+</div>
+
+<div class="browse">
+  <form method="get" class="filters" aria-label="Filtreler">
+    <h2>Filtrele</h2>
+    <input type="hidden" name="sort" value="{{ current.sort }}">
+
+    <div class="field">
+      <label for="f-brand">Marka</label>
+      <select id="f-brand" name="brand">
+        <option value="">Tüm markalar</option>
+        {% for b in brands %}
+          <option value="{{ b }}" {% if b == current.brand %}selected{% endif %}>{{ b }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="f-price">En yüksek fiyat</label>
+      <input id="f-price" type="number" name="max_price" min="0" step="50000" inputmode="numeric"
+             value="{{ current.max_price }}" placeholder="Örn: 1000000">
+      <div class="field__hint">TL cinsinden, nokta koymadan yaz.</div>
+    </div>
+
+    <fieldset class="fieldset-reset">
+      <legend>Yakıt</legend>
+      <div class="chips">
+        <label class="chip"><input type="radio" name="fuel" value="" {% if not current.fuel %}checked{% endif %}><span>Hepsi</span></label>
+        {% for value, label in fuel_choices %}
+          <label class="chip"><input type="radio" name="fuel" value="{{ value }}" {% if value == current.fuel %}checked{% endif %}><span>{{ label }}</span></label>
+        {% endfor %}
+      </div>
+    </fieldset>
+
+    <div class="filters__actions">
+      <button type="submit" class="btn btn--dark">Sonuçları göster</button>
+      {% if has_filters %}<a href="{% url 'listing-list' %}" class="btn btn--ghost">Filtreleri temizle</a>{% endif %}
+    </div>
+  </form>
+
+  <section aria-label="Sonuçlar">
+    <div class="results-head">
+      <strong>{{ paginator.count|km }} sonuç</strong>
+      <form method="get">
+        {% for key, value in request.GET.items %}{% if key != "sort" and key != "page" %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endif %}{% endfor %}
+        <label for="f-sort" class="visually-hidden">Sıralama</label>
+        <select id="f-sort" name="sort" onchange="this.form.submit()">
+          {% for key, label in sort_options %}
+            <option value="{{ key }}" {% if key == current.sort %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <noscript><button class="btn btn--ghost btn--sm">Sırala</button></noscript>
+      </form>
+    </div>
+
+    {% if listings %}
+    <div class="listing-table">
+      <div class="listing-table__head" aria-hidden="true">
+        <span>Şehir</span><span>Araç</span><span>Yıl</span><span>Kilometre</span><span>Yakıt</span><span class="right">Fiyat</span>
+      </div>
+      {% for listing in listings %}
+      <a class="listing-row" href="{% url 'listing-detail' listing.pk %}">
+        {% include "listings/_plate.html" with city=listing.city %}
+        <div class="listing-row__main">
+          <div class="listing-row__title">{{ listing.brand }} {{ listing.model_name }}</div>
+          <div class="listing-row__desc">{{ listing.city }}{% if listing.description %} — {{ listing.description }}{% endif %}</div>
+        </div>
+        <div class="listing-row__meta">
+          <span class="num"><span class="cell-label">Yıl </span>{{ listing.year }}</span>
+          <span class="num">{{ listing.mileage_km|km }} km</span>
+          <span>{{ listing.get_fuel_type_display }}</span>
+        </div>
+        <div class="listing-row__price">{{ listing.price|tl }} <small>TL</small></div>
+      </a>
+      {% endfor %}
+    </div>
+
+    {% if is_paginated %}
+    <nav class="pagination" aria-label="Sayfalar">
+      {% if page_obj.has_previous %}
+        <a class="btn btn--ghost" href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ page_obj.previous_page_number }}">Önceki sayfa</a>
+      {% else %}
+        <span class="btn btn--ghost" aria-disabled="true">Önceki sayfa</span>
+      {% endif %}
+      <span class="pagination__status">Sayfa {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}
+        <a class="btn btn--ghost" href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ page_obj.next_page_number }}">Sonraki sayfa</a>
+      {% else %}
+        <span class="btn btn--ghost" aria-disabled="true">Sonraki sayfa</span>
+      {% endif %}
+    </nav>
+    {% endif %}
+
+    {% else %}
+    <div class="empty">
+      <h2>Bu filtrelere uyan ilan yok</h2>
+      {% if has_filters %}
+        <p>Fiyat sınırını yükseltmeyi veya başka bir marka seçmeyi dene.</p>
+        <a href="{% url 'listing-list' %}" class="btn btn--dark">Filtreleri temizle</a>
+      {% else %}
+        <p>Henüz hiç ilan yok. İlk ilanı sen ekle ya da örnek veri üret:<br><code>python manage.py generate_data</code></p>
+        <a href="{% url 'listing-create' %}" class="btn btn--signal">İlan ver</a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </section>
 </div>
 {% endblock %}

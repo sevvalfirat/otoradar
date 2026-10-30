@@ -1,71 +1,78 @@
 import random
+from datetime import date
+
 from django.core.management.base import BaseCommand
-from faker import Faker
+
+from listings.catalog import CAR_CATALOG
 from listings.models import Listing
-
-fake = Faker("tr_TR")
-
-# Marka -> model -> baz fiyat aralığı (gerçekçi dağılım için)
-CAR_CATALOG = {
-    "Toyota":    {"models": ["Corolla", "Yaris", "C-HR"],        "base_price": 950_000},
-    "Volkswagen":{"models": ["Golf", "Passat", "Polo"],          "base_price": 1_100_000},
-    "Fiat":      {"models": ["Egea", "Tipo"],                    "base_price": 650_000},
-    "Renault":   {"models": ["Clio", "Megane", "Talisman"],      "base_price": 700_000},
-    "Seat":      {"models": ["Ibiza", "Leon"],                   "base_price": 800_000},
-    "Honda":     {"models": ["Civic", "City"],                   "base_price": 1_050_000},
-    "Hyundai":   {"models": ["i20", "Tucson"],                   "base_price": 900_000},
-    "BMW":       {"models": ["3 Serisi", "1 Serisi"],            "base_price": 2_200_000},
-    "Mercedes":  {"models": ["C Serisi", "A Serisi"],            "base_price": 2_400_000},
-    "Audi":      {"models": ["A3", "A4"],                        "base_price": 2_100_000},
-}
 
 CITIES = ["Istanbul", "Ankara", "Izmir", "Bursa", "Antalya", "Adana"]
 FUEL = ["benzin", "dizel", "lpg", "hibrit"]
 TRANS = ["manuel", "otomatik"]
+
+NORMAL_DESCRIPTIONS = [
+    "Bakımları yetkili serviste yapıldı.",
+    "Değişensiz, boyasız.",
+    "İlk sahibinden, garajda tutuldu.",
+    "Lastikler yeni, muayenesi yeni yapıldı.",
+    "Ufak çizikler dışında temiz.",
+    "",
+]
 
 
 class Command(BaseCommand):
     help = "Sentetik araç ilanı verisi üretir"
 
     def add_arguments(self, parser):
-        parser.add_argument("--count", type=int, default=3000)
+        parser.add_argument("--count", type=int, default=3000, help="Üretilecek ilan sayısı")
         parser.add_argument("--anomaly-rate", type=float, default=0.03,
-                             help="Anormal (çok ucuz/pahalı) ilan oranı")
+                            help="Bilinçli olarak çok ucuz/pahalı üretilecek ilan oranı")
+        parser.add_argument("--clear", action="store_true",
+                            help="Önce mevcut bütün ilanları siler")
 
     def handle(self, *args, **options):
         count = options["count"]
         anomaly_rate = options["anomaly_rate"]
-        objs = []
+        this_year = date.today().year
 
+        if options["clear"]:
+            deleted, _ = Listing.objects.all().delete()
+            self.stdout.write(f"{deleted} eski ilan silindi.")
+
+        objs, anomalies = [], 0
         for _ in range(count):
-            brand = random.choice(list(CAR_CATALOG.keys()))
+            brand = random.choice(list(CAR_CATALOG))
             info = CAR_CATALOG[brand]
-            model_name = random.choice(info["models"])
-            year = random.randint(2012, 2024)
-            age = 2026 - year
+            year = random.randint(2012, this_year)
+            age = this_year - year
 
-            # Yaş ve kilometre arttıkça fiyat düşer, gerçekçi bir formül
+            # Yaş arttıkça kilometre artar, fiyat her yıl ~%7 düşer
             mileage = max(0, int(random.gauss(age * 18000, 8000)))
             price = info["base_price"] * (0.93 ** age) * random.uniform(0.9, 1.1)
 
-            # %3 ihtimalle bilinçli anomali üret (agent bunları yakalayacak)
+            # Belirli oranda bilinçli anomali (anomali tespiti bunları yakalamalı)
             is_anomaly = random.random() < anomaly_rate
+            description = random.choice(NORMAL_DESCRIPTIONS)
             if is_anomaly:
-                price *= random.choice([0.5, 0.55, 1.6, 1.7])  # çok ucuz ya da çok pahalı
+                factor = random.choice([0.5, 0.55, 1.6, 1.7])
+                price *= factor
+                anomalies += 1
+                description = ("Acil satılık, fiyat düşüktür." if factor < 1
+                               else "Full paket, fiyatta pazarlık yoktur.")
 
             objs.append(Listing(
                 brand=brand,
-                model_name=model_name,
+                model_name=random.choice(info["models"]),
                 year=year,
                 mileage_km=mileage,
                 price=round(price, 2),
                 fuel_type=random.choice(FUEL),
                 transmission=random.choice(TRANS),
                 city=random.choice(CITIES),
-                description="" if not is_anomaly else "Acil satılık, fiyat düşüktür",
+                description=description,
             ))
 
         Listing.objects.bulk_create(objs, batch_size=500)
         self.stdout.write(self.style.SUCCESS(
-            f"{count} ilan oluşturuldu ({int(count*anomaly_rate)} adet bilinçli anomali dahil)"
+            f"{count} ilan oluşturuldu ({anomalies} bilinçli anomali dahil)."
         ))
