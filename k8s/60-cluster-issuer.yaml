@@ -1,0 +1,17 @@
+# Let's Encrypt'ten ücretsiz sertifika almak için "sertifika veren" tanımı.
+# HTTP-01 doğrulaması: Let's Encrypt, alan adına HTTP ile bağlanıp
+# cert-manager'ın koyduğu doğrulama dosyasını görmek ister (Traefik üzerinden).
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: fsevvalfirat@gmail.com
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: traefik
